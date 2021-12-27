@@ -16,6 +16,12 @@ status = JSON.parse(response.body)['Countries']
 countries = status.map { |e| e['Country'] }
 rows = []
 
+puts 'Enter "Countries" to see the list of available countries'
+puts 'Enter name of the country to see Covid informarion'
+ARGV[0] = gets.chomp
+
+puts countries if ARGV[0] == 'Countries'
+
 (0...countries.size).each do |index|
   next unless ARGV[0] == countries[index]
 
