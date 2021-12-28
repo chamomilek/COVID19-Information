@@ -16,11 +16,21 @@ status = JSON.parse(response.body)['Countries']
 countries = status.map { |e| e['Country'] }
 rows = []
 
-puts 'Enter "Countries" to see the list of available countries'
-puts 'Enter name of the country to see Covid informarion'
+puts 'Enter "C" to see the list of available countries'
+puts 'Or enter country name to see Covid informarion'
 ARGV[0] = gets.chomp
 
-puts countries if ARGV[0] == 'Countries'
+puts countries if ARGV[0] == 'C'
+# if ARGV[0] == 'C'
+#   table = Terminal::Table.new do |t|
+#     t.headings = %w[id name]
+#      (0...countries.size).each do |index|
+#        t.rows[index] = [[index + 1], countries[index]]
+#      end
+#     t.style = { border_top: false, border_bottom: false }
+#   end
+#   puts table
+# end
 
 (0...countries.size).each do |index|
   next unless ARGV[0] == countries[index]
