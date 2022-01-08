@@ -4,6 +4,8 @@ require 'json'
 require 'uri'
 require 'net/http'
 require 'terminal-table'
+require 'cachethod'
+require 'active_support/all'
 
 class HTTP
   attr_reader :new_url
@@ -27,6 +29,9 @@ class HTTP
 end
 
 class Output
+  include Cachethod
+  cache_methods [:letter, :c_name], expires_in: 1.minutes
+
   attr_reader :aRGV, :countrie, :rows, :status
 
   def initialize(aRGV, countrie, rows, status)
