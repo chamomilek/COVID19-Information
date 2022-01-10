@@ -4,7 +4,6 @@ require 'json'
 require 'uri'
 require 'net/http'
 require 'terminal-table'
-require 'cachethod'
 require 'active_support/all'
 
 class HTTP
@@ -28,16 +27,31 @@ class HTTP
   end
 end
 
-class Output
-  include Cachethod
-  cache_methods [:letter, :c_name], expires_in: 1.minutes
+class Cache
+  def self.fetch key, expires_in = 30, &block
+    @cache = {}
+    if @cache.key?(key) && (@cache[key][:expiration_time] > Time.now.to_i)
+      puts "fetch from cache and will expire in #{@cache[key][:expiration_time] - Time.now.to_i}"
+      @cache[key][:value]
+    else
+      if block_given?
+        puts "did not find key in cache, executing block"
+        @cache[key] = {value: yield(block), expiration_time: Time.now.to_i + expires_in}
+        @cache[key][:value]
+      else
+        nil
+      end
+    end
+  end
+end
 
+class Output
   attr_reader :aRGV, :countrie, :rows, :status
 
-  def initialize(aRGV, countrie, rows, status)
+  def initialize(aRGV, countrie, _rows, status)
     @aRGV = aRGV
     @countrie = countrie
-    @rows = Array.new
+    @rows = []
     @status = status
   end
 
@@ -48,6 +62,7 @@ class Output
   def c_name
     (0...countrie.size).each do |index|
       next unless aRGV == countrie[index]
+
       # print status[index]
       rows << ['Country', status[index]['Country']]
       rows << ['CountryCode', status[index]['CountryCode']]
@@ -66,14 +81,25 @@ class Output
 end
 
 htp = HTTP.new 'https://api.covid19api.com/summary'
-# countrie = htp.proxy()
+rows = []
+aRGV = gets.chomp
 status = htp.proxy
 countrie = htp.cntrs(status)
 
 puts 'Enter "C" to see the list of available countries'
 puts 'Or enter country name to see Covid informarion'
-rows=[]
-aRGV = gets.chomp
+
 choice = Output.new(aRGV, countrie, rows, status)
-choice.letter
-choice.c_name
+#  cache = ActiveSupport::Cache::MemoryStore.new(expires_in: 1.minute)
+# cache.fetch(choice.c_name) do
+#   choice.c_name
+# end
+#  cache.write(aRGV, choice.letter)
+#  cache.fetch(choice.letter)
+
+  Cache.fetch(choice.c_name) do
+   choice.c_name
+ end
+Cache.fetch(choice.letter) do
+  choice.letter
+end
