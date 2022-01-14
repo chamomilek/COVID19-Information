@@ -27,39 +27,49 @@ class HTTP
   end
 end
 
-class Cache
-  def self.fetch key, expires_in = 30, &block
-    @cache = {}
-    if @cache.key?(key) && (@cache[key][:expiration_time] > Time.now.to_i)
-      puts "fetch from cache and will expire in #{@cache[key][:expiration_time] - Time.now.to_i}"
-      @cache[key][:value]
-    else
-      if block_given?
-        puts "did not find key in cache, executing block"
-        @cache[key] = {value: yield(block), expiration_time: Time.now.to_i + expires_in}
-        @cache[key][:value]
-      else
-        nil
-      end
-    end
-  end
-end
+# class Cache
+#   def self.fetch key, expires_in = 30, &block
+#     @cache = {}
+#     if @cache.key?(key) && (@cache[key][:expiration_time] > Time.now.to_i)
+#       puts "fetch from cache and will expire in #{@cache[key][:expiration_time] - Time.now.to_i}"
+#       @cache[key][:value]
+#     else
+#       if block_given?
+#         puts "did not find key in cache, executing block"
+#         @cache[key] = {value: yield(block), expiration_time: Time.now.to_i + expires_in}
+#         @cache[key][:value]
+#       else
+#         nil
+#       end
+#     end
+#   end
+# end
 
 class Output
-  attr_reader :aRGV, :countrie, :rows, :status
+  attr_reader :aRGV, :countrie, :rows, :status, :file
 
-  def initialize(aRGV, countrie, _rows, status)
+  def initialize(aRGV, countrie, _rows, status, file)
     @aRGV = aRGV
     @countrie = countrie
     @rows = []
     @status = status
+    @file = "C:\Users\Asus\Desktop\delete\кэш"
   end
 
-  def letter
-    puts countrie if aRGV == 'C'
+  def letter(file)
+    countrie if aRGV == 'C'
+    file.puts("Name of countries: ")
+    if File.zero?("C:\Users\Asus\Desktop\delete\кэш")
+      file.puts(countrie)
+      fh = open file
+      fh.each do |line|
+         puts line
+      end
+    end
+      fh.close
   end
 
-  def c_name
+  def c_name(file)
     (0...countrie.size).each do |index|
       next unless aRGV == countrie[index]
 
@@ -75,12 +85,18 @@ class Output
       rows << ['TotalRecovered', status[index]['TotalRecovered']]
       rows << ['Date', status[index]['Date']]
       table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
-      puts table
+      if !File.zero?("C:\Users\Asus\Desktop\delete\кэш")
+      puts show = file.read
+    else
+        file.puts(table)
+        puts shw = file.read
+    end
     end
   end
 end
 
 htp = HTTP.new 'https://api.covid19api.com/summary'
+file = File.new("C:\Users\Asus\Desktop\delete\кэш", "w+", expires_in: 1.minute)
 rows = []
 aRGV = gets.chomp
 status = htp.proxy
@@ -89,17 +105,13 @@ countrie = htp.cntrs(status)
 puts 'Enter "C" to see the list of available countries'
 puts 'Or enter country name to see Covid informarion'
 
-choice = Output.new(aRGV, countrie, rows, status)
-#  cache = ActiveSupport::Cache::MemoryStore.new(expires_in: 1.minute)
-# cache.fetch(choice.c_name) do
-#   choice.c_name
-# end
-#  cache.write(aRGV, choice.letter)
-#  cache.fetch(choice.letter)
-
-  Cache.fetch(choice.c_name) do
-   choice.c_name
+choice = Output.new(aRGV, countrie, rows, status, "C:\Users\Asus\Desktop\delete\кэш")
+# choice.letter(file)
+# choice.c_name(file)
+file_letter = File.open(file, 'r'){ |file| file.read }
+ cache = ActiveSupport::Cache::MemoryStore.new(expires_in: 1.minute)
+ cache.fetch(file_letter) do
+  choice.letter(file)
  end
-Cache.fetch(choice.letter) do
-  choice.letter
-end
+ cache.write(aRGV, choice.c_name(file))
+ cache.read(file_letter)
