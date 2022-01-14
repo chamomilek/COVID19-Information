@@ -48,7 +48,7 @@ end
 class Output
   attr_reader :aRGV, :countrie, :rows, :status, :file
 
-  def initialize(aRGV, countrie, _rows, status, file)
+  def initialize(aRGV, countrie, _rows, status, _file)
     @aRGV = aRGV
     @countrie = countrie
     @rows = []
@@ -58,15 +58,15 @@ class Output
 
   def letter(file)
     countrie if aRGV == 'C'
-    file.puts("Name of countries: ")
+    file.puts('Name of countries: ')
     if File.zero?("C:\Users\Asus\Desktop\delete\кэш")
       file.puts(countrie)
       fh = open file
       fh.each do |line|
-         puts line
+        puts line
       end
     end
-      fh.close
+    fh.close
   end
 
   def c_name(file)
@@ -86,17 +86,17 @@ class Output
       rows << ['Date', status[index]['Date']]
       table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
       if !File.zero?("C:\Users\Asus\Desktop\delete\кэш")
-      puts show = file.read
-    else
+        puts show = file.read
+      else
         file.puts(table)
         puts shw = file.read
-    end
+      end
     end
   end
 end
 
 htp = HTTP.new 'https://api.covid19api.com/summary'
-file = File.new("C:\Users\Asus\Desktop\delete\кэш", "w+", expires_in: 1.minute)
+file = File.new("C:\Users\Asus\Desktop\delete\кэш", 'w+', expires_in: 1.minute)
 rows = []
 aRGV = gets.chomp
 status = htp.proxy
@@ -108,10 +108,10 @@ puts 'Or enter country name to see Covid informarion'
 choice = Output.new(aRGV, countrie, rows, status, "C:\Users\Asus\Desktop\delete\кэш")
 # choice.letter(file)
 # choice.c_name(file)
-file_letter = File.open(file, 'r'){ |file| file.read }
- cache = ActiveSupport::Cache::MemoryStore.new(expires_in: 1.minute)
- cache.fetch(file_letter) do
+file_letter = File.open(file, 'r', &:read)
+cache = ActiveSupport::Cache::MemoryStore.new(expires_in: 1.minute)
+cache.fetch(file_letter) do
   choice.letter(file)
- end
- cache.write(aRGV, choice.c_name(file))
- cache.read(file_letter)
+end
+cache.write(aRGV, choice.c_name(file))
+cache.read(file_letter)
