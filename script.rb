@@ -85,9 +85,7 @@ class Output
       rows << ['TotalRecovered', status[index]['TotalRecovered']]
       rows << ['Date', status[index]['Date']]
       table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
-      if !File.zero?("C:\Users\Asus\Desktop\delete\кэш")
-        puts show = file.read
-      else
+      if File.zero?("C:\Users\Asus\Desktop\delete\кэш")
         file.puts(table)
         puts shw = file.read
       end
