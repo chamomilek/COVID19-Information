@@ -5,34 +5,48 @@ require 'uri'
 require 'net/http'
 require 'terminal-table'
 require 'active_support/all'
+require_relative 'script'
+# Filename ||= '/data.json'
 
 class HTTP
-  attr_reader :new_url
+  attr_reader :new_url, :filename
 
-  def initialize(new_url)
+  def initialize(new_url, filename)
     @new_url = new_url
+    @filename = filename
   end
 
-  def proxy
+  def access
     url = URI.parse(new_url)
     https = Net::HTTP.new(url.host, url.port)
     https.use_ssl = true
+
     request = Net::HTTP::Get.new(url)
     response = https.request(request)
-    status = JSON.parse(response.body)['Countries']
-  end
-
-  def cntrs(status)
-    countries = status.map { |e| e['Country'] }
-  end
-end
-
-module FileCache
-  def self.open(lifetime: 24 * 60)
     begin
-      filename = "C:\Users\Asus\Desktop\delete\кэш"
+      response.code == 200
+    rescue StandardError
+      puts 'Status code error!!'
+    end
+      status = JSON.parse(response.body)['Countries']
+    File.open(filename, 'w') do |f|
+      f.write(JSON.pretty_generate(status))
+    end
+  end
+  # def countrs(status)
+  #   countries = JSON.parse(status.map { |e| e['Country'] })
+  #   end
+  end
+
+class FileCache
+  def self.open(lifetime: 24 * 60, format: :json)
+    begin
       data = if File.exist?(filename) && ((Time.now.to_i - File.mtime(filename).to_i) < lifetime * 60)
                puts content = File.read(filename)
+               case format
+               when :json
+                 JSON.parse(content)
+               end
              end
     rescue Exception
       # loading cache file failed
@@ -41,7 +55,11 @@ module FileCache
     unless data
       data = yield
       File.open(filename, 'w') do |io|
-        content = data
+        content = nil
+        case format
+        when :json
+          content = data.to_json
+        end
         io.print(content)
       end
     end
@@ -50,27 +68,22 @@ module FileCache
 end
 
 class Output
-  include FileCache
-  attr_reader :aRGV, :countrie, :rows, :status
+  attr_reader :argv, :status
 
-  def initialize(aRGV, countrie, _rows, status)
-    @aRGV = aRGV
-    @countrie = countrie
-    @rows = []
+  def initialize(argv, status)
+    @argv = argv
     @status = status
   end
 
   def letter
-    data = FileCache.open(lifetime: 1) do
-      countrie if aRGV == 'C'
-    end
+    countrie if aRGV == 'C'
   end
 
-  def c_name
+  def country_info
     data = FileCache.open(lifetime: 1) do
+      countrie = JSON.parse(status.map { |e| e['Country'] })
       (0...countrie.size).each do |index|
         next unless aRGV == countrie[index]
-
         # print status[index]
         rows << ['Country', status[index]['Country']]
         rows << ['CountryCode', status[index]['CountryCode']]
@@ -83,27 +96,22 @@ class Output
         rows << ['TotalRecovered', status[index]['TotalRecovered']]
         rows << ['Date', status[index]['Date']]
         table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
+        puts table
       end
     end
   end
 end
-
+Filename = '/data.json'
 puts 'Enter "C" to see the list of available countries'
 puts 'Or enter country name to see Covid informarion'
-htp = HTTP.new 'https://api.covid19api.com/summary'
-# file = File.new("C:\Users\Asus\Desktop\delete\кэш", 'w+', expires_in: 1.minute)
+htp = HTTP.new 'https://api.covid19api.com/summary', Filename
 rows = []
 aRGV = gets.chomp
-status = htp.proxy
-countrie = htp.cntrs(status)
-
-choice = Output.new(aRGV, countrie, rows, status)
+status = htp.access
+st = JSON.parse(Filename)
+countrie = st.map { |e| e['Country'] }
+# countrie = htp.countrs(status)
+#
+choice = Output.new(aRGV, status)
+choice.country_info
 choice.letter
-choice.c_name
-# file_letter = File.open(file, 'r', &:read)
-# cache = ActiveSupport::Cache::MemoryStore.new(expires_in: 1.minute)
-# cache.fetch(file_letter) do
-# choice.letter
-# end
-# cache.write(aRGV, choice.c_name(file))
-# cache.read(file_letter)
