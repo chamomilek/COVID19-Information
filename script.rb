@@ -6,7 +6,6 @@ require 'net/http'
 require 'terminal-table'
 require 'active_support/all'
 require_relative 'script'
-# Filename ||= '/data.json'
 
 class HTTP
   attr_reader :new_url, :filename
@@ -28,18 +27,34 @@ class HTTP
     rescue StandardError
       puts 'Status code error!!'
     end
-      status = JSON.parse(response.body)['Countries']
+    status = JSON.parse(response.body)
     File.open(filename, 'w') do |f|
       f.write(JSON.pretty_generate(status))
     end
   end
-  # def countrs(status)
-  #   countries = JSON.parse(status.map { |e| e['Country'] })
-  #   end
+end
+
+class Json
+  attr_reader :filename
+
+  def initialize(filename)
+    @filename = filename
   end
+
+  def parsing
+    file = open(filename)
+    json = file.read
+    JSON.parse(json)['Countries']
+  end
+
+  def countries_list(parsed)
+    parsed.map { |e| e['Country'] }
+  end
+end
 
 class FileCache
   def self.open(lifetime: 24 * 60, format: :json)
+    filename = 'country_info.json'
     begin
       data = if File.exist?(filename) && ((Time.now.to_i - File.mtime(filename).to_i) < lifetime * 60)
                puts content = File.read(filename)
@@ -54,13 +69,13 @@ class FileCache
     end
     unless data
       data = yield
-      File.open(filename, 'w') do |io|
+      File.open(filename, 'w') do |f|
         content = nil
         case format
         when :json
           content = data.to_json
         end
-        io.print(content)
+        f.print(content)
       end
     end
     data
@@ -68,22 +83,23 @@ class FileCache
 end
 
 class Output
-  attr_reader :argv, :status
+  attr_reader :argv, :status, :countries_result, :rows
 
-  def initialize(argv, status)
+  def initialize(argv, status, countries_result)
     @argv = argv
     @status = status
+    @countries_result = countries_result
+    @rows = []
   end
 
   def letter
-    countrie if aRGV == 'C'
+    puts countries_result if argv == 'C'
   end
 
   def country_info
-    data = FileCache.open(lifetime: 1) do
-      countrie = JSON.parse(status.map { |e| e['Country'] })
-      (0...countrie.size).each do |index|
-        next unless aRGV == countrie[index]
+    FileCache.open(lifetime: 1) do
+      (0...countries_result.size).each do |index|
+        next unless argv == countries_result[index]
         # print status[index]
         rows << ['Country', status[index]['Country']]
         rows << ['CountryCode', status[index]['CountryCode']]
@@ -101,17 +117,16 @@ class Output
     end
   end
 end
-Filename = '/data.json'
+
+filename = 'data.json'
 puts 'Enter "C" to see the list of available countries'
-puts 'Or enter country name to see Covid informarion'
-htp = HTTP.new 'https://api.covid19api.com/summary', Filename
-rows = []
-aRGV = gets.chomp
-status = htp.access
-st = JSON.parse(Filename)
-countrie = st.map { |e| e['Country'] }
-# countrie = htp.countrs(status)
-#
-choice = Output.new(aRGV, status)
-choice.country_info
+puts 'Or enter country name to see Covid information'
+htp = HTTP.new 'https://api.covid19api.com/summary', filename
+htp.access
+json = Json.new(filename)
+status = json.parsing
+countries_result = json.countries_list(status)
+argv = gets.chomp
+choice = Output.new(argv, status, countries_result)
 choice.letter
+choice.country_info
