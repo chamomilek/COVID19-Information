@@ -5,14 +5,14 @@ require 'uri'
 require 'net/http'
 require 'terminal-table'
 require 'active_support/all'
+require 'optparse'
 require_relative 'script'
 
 class HTTP
-  attr_reader :new_url, :filename
+  attr_reader :new_url
 
-  def initialize(new_url, filename)
+  def initialize(new_url)
     @new_url = new_url
-    @filename = filename
   end
 
   def access
@@ -27,106 +27,128 @@ class HTTP
     rescue StandardError
       puts 'Status code error!!'
     end
-    status = JSON.parse(response.body)
-    File.open(filename, 'w') do |f|
-      f.write(JSON.pretty_generate(status))
+    JSON.parse(response.body)
+  end
+end
+
+class OptParse
+  def self.parse(country, structure_json, full_info)
+    options = OpenStruct.new
+    OptionParser.new do |parser|
+      parser.on('-c', '--countries', 'List of countries') do
+        puts country.list
+      end
+      parser.on('--s [VALUE]', String) do |s|
+        options.s = s
+        structure_json.open(full_info, s)
+      end
+    end.parse!
+  end
+end
+
+class Country
+  attr_reader :filename, :structure_json, :htp
+
+  def initialize(filename, structure_json, htp)
+    @filename = filename
+    @structure_json = structure_json
+    @htp = htp
+  end
+
+  def list
+    if File.zero?(filename)
+      structure_json.new_structure(htp)
+    else
+      f = File.open(filename, 'r')
+      parsed = JSON.parse(f.read)
+      parsed['cache'].keys
     end
   end
 end
 
-class Json
-  attr_reader :filename
+class Covid
+  attr_reader :filename, :rows
 
   def initialize(filename)
+    @rows = []
     @filename = filename
   end
 
-  def parsing
-    file = open(filename)
-    json = file.read
-    JSON.parse(json)['Countries']
-  end
-
-  def countries_list(parsed)
-    parsed.map { |e| e['Country'] }
+  def statistics(argv)
+    f = File.open(filename, 'r')
+    parsed = JSON.parse(f.read)
+    # argv = OptParse.parse(country, structure_json)
+    parsed['cache'].select do |k,v| if (k == argv)
+                                   rows << ['Country', v['Country']]
+                                   rows << ['CountryCode', v['CountryCode']]
+                                   rows << ['Slug', v['Slug']]
+                                   rows << ['NewConfirmed', v['NewConfirmed']]
+                                   rows << ['TotalConfirmed', v['TotalConfirmed']]
+                                   rows << ['NewDeaths', v['NewDeaths']]
+                                   rows << ['TotalDeaths', v['TotalDeaths']]
+                                   rows << ['NewRecovered', v['NewRecovered']]
+                                   rows << ['TotalRecovered', v['TotalRecovered']]
+                                   rows << ['Date', v['Date']]
+      table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
+      puts table
+                                    end
+    end
   end
 end
 
 class FileCache
-  def self.open(lifetime: 24 * 60, format: :json)
-    filename = 'country_info.json'
-    begin
-      data = if File.exist?(filename) && ((Time.now.to_i - File.mtime(filename).to_i) < lifetime * 60)
-               puts content = File.read(filename)
-               case format
-               when :json
-                 JSON.parse(content)
-               end
-             end
-    rescue Exception
-      # loading cache file failed
-      data = nil
+  attr_reader :json, :full_info
+
+  def initialize
+    @str = {}
+    @filename = 'data.json'
+    @json = json
+    @full_info = full_info
+  end
+
+  def new_structure(htp)
+    json = htp.access
+    data = json['Countries']
+    hashtable = {}
+    str = { updated_at: Time.now,
+            cache: {} }
+
+    data.each do |item|
+      hashtable[item['Country']] = {
+        'Country': item['Country'],
+        'CountryCode': item['CountryCode'],
+        'Slug': item['Slug'],
+        'NewConfirmed': item['NewConfirmed'],
+        'TotalConfirmed': item['TotalConfirmed'],
+        'NewDeaths': item['NewDeaths'],
+        'TotalDeaths': item['TotalDeaths'],
+        'NewRecovered': item['NewRecovered'],
+        'TotalRecovered': item['TotalRecovered'],
+        'Date': item['Date']
+      }
     end
-    unless data
-      data = yield
-      File.open(filename, 'w') do |f|
-        content = nil
-        case format
-        when :json
-          content = data.to_json
-        end
-        f.print(content)
-      end
+    data.each do |item|
+      str[:cache][item['Country']] = hashtable[item['Country']]
     end
-    data
-  end
-end
 
-class Output
-  attr_reader :argv, :status, :countries_result, :rows
-
-  def initialize(argv, status, countries_result)
-    @argv = argv
-    @status = status
-    @countries_result = countries_result
-    @rows = []
+    File.open(@filename, 'w') do |f|
+      f.write(JSON.pretty_generate(str))
+    end
   end
 
-  def letter
-    puts countries_result if argv == 'C'
-  end
-
-  def country_info
-    FileCache.open(lifetime: 1) do
-      (0...countries_result.size).each do |index|
-        next unless argv == countries_result[index]
-        # print status[index]
-        rows << ['Country', status[index]['Country']]
-        rows << ['CountryCode', status[index]['CountryCode']]
-        rows << ['Slug', status[index]['Slug']]
-        rows << ['NewConfirmed', status[index]['NewConfirmed']]
-        rows << ['TotalConfirmed', status[index]['TotalConfirmed']]
-        rows << ['NewDeaths', status[index]['NewDeaths']]
-        rows << ['TotalDeaths', status[index]['TotalDeaths']]
-        rows << ['NewRecovered', status[index]['NewRecovered']]
-        rows << ['TotalRecovered', status[index]['TotalRecovered']]
-        rows << ['Date', status[index]['Date']]
-        table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
-        puts table
-      end
+  def open(full_info, argv)
+    $lifetime = 24 * 60
+    if File.zero?(@filename)
+      new_structure(json)
+    else
+      full_info.statistics(argv)
     end
   end
 end
 
 filename = 'data.json'
-puts 'Enter "C" to see the list of available countries'
-puts 'Or enter country name to see Covid information'
-htp = HTTP.new 'https://api.covid19api.com/summary', filename
-htp.access
-json = Json.new(filename)
-status = json.parsing
-countries_result = json.countries_list(status)
-argv = gets.chomp
-choice = Output.new(argv, status, countries_result)
-choice.letter
-choice.country_info
+htp = HTTP.new 'https://api.covid19api.com/summary'
+full_info = Covid.new(filename)
+structure_json = FileCache.new
+country = Country.new(filename, structure_json, htp)
+OptParse.parse(country, structure_json, full_info)
