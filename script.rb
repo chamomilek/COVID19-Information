@@ -6,7 +6,9 @@ require 'net/http'
 require 'terminal-table'
 require 'active_support/all'
 require 'optparse'
+require 'time'
 require_relative 'script'
+$lifetime = 24 * 60
 
 class HTTP
   attr_reader :new_url
@@ -32,7 +34,7 @@ class HTTP
 end
 
 class OptParse
-  def self.parse(country, structure_json, full_info)
+  def self.parse(country, structure_json, full_info, htp)
     options = OpenStruct.new
     OptionParser.new do |parser|
       parser.on('-c', '--countries', 'List of countries') do
@@ -40,7 +42,7 @@ class OptParse
       end
       parser.on('--s [VALUE]', String) do |s|
         options.s = s
-        structure_json.open(full_info, s)
+        structure_json.open(full_info, s, htp)
       end
     end.parse!
   end
@@ -77,21 +79,21 @@ class Covid
   def statistics(argv)
     f = File.open(filename, 'r')
     parsed = JSON.parse(f.read)
-    # argv = OptParse.parse(country, structure_json)
-    parsed['cache'].select do |k,v| if (k == argv)
-                                   rows << ['Country', v['Country']]
-                                   rows << ['CountryCode', v['CountryCode']]
-                                   rows << ['Slug', v['Slug']]
-                                   rows << ['NewConfirmed', v['NewConfirmed']]
-                                   rows << ['TotalConfirmed', v['TotalConfirmed']]
-                                   rows << ['NewDeaths', v['NewDeaths']]
-                                   rows << ['TotalDeaths', v['TotalDeaths']]
-                                   rows << ['NewRecovered', v['NewRecovered']]
-                                   rows << ['TotalRecovered', v['TotalRecovered']]
-                                   rows << ['Date', v['Date']]
+    parsed['cache'].select do |k, v|
+      next unless k == argv
+
+      rows << ['Country', v['Country']]
+      rows << ['CountryCode', v['CountryCode']]
+      rows << ['Slug', v['Slug']]
+      rows << ['NewConfirmed', v['NewConfirmed']]
+      rows << ['TotalConfirmed', v['TotalConfirmed']]
+      rows << ['NewDeaths', v['NewDeaths']]
+      rows << ['TotalDeaths', v['TotalDeaths']]
+      rows << ['NewRecovered', v['NewRecovered']]
+      rows << ['TotalRecovered', v['TotalRecovered']]
+      rows << ['Date', v['Date']]
       table = Terminal::Table.new title: 'Covid-19 Information', rows: rows
       puts table
-                                    end
     end
   end
 end
@@ -136,13 +138,12 @@ class FileCache
     end
   end
 
-  def open(full_info, argv)
-    $lifetime = 24 * 60
-    if File.zero?(@filename)
-      new_structure(json)
-    else
-      full_info.statistics(argv)
-    end
+  def open(full_info, argv, htp)
+    f = File.open(@filename, 'r')
+    parsed = JSON.parse(f.read)
+    t = Time.parse(parsed['updated_at'])
+    new_structure(htp) if File.zero?(@filename) || ((Time.now.to_i - t.to_i) > $lifetime * 1 / 60)
+    full_info.statistics(argv)
   end
 end
 
@@ -151,4 +152,4 @@ htp = HTTP.new 'https://api.covid19api.com/summary'
 full_info = Covid.new(filename)
 structure_json = FileCache.new
 country = Country.new(filename, structure_json, htp)
-OptParse.parse(country, structure_json, full_info)
+OptParse.parse(country, structure_json, full_info, htp)
