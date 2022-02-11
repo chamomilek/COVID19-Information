@@ -7,8 +7,6 @@ require 'terminal-table'
 require 'active_support/all'
 require 'optparse'
 require 'time'
-require_relative 'script'
-$lifetime = 24 * 60
 
 class HTTP
   attr_reader :new_url
@@ -58,13 +56,12 @@ class Country
   end
 
   def list
-    if File.zero?(filename)
+    if File.zero?(filename) || !File.exist?(filename)
       structure_json.new_structure(htp)
-    else
+      end
       f = File.open(filename, 'r')
       parsed = JSON.parse(f.read)
       parsed['cache'].keys
-    end
   end
 end
 
@@ -99,6 +96,8 @@ class Covid
 end
 
 class FileCache
+  LIFETIME = 24 * 60
+
   attr_reader :json, :full_info
 
   def initialize
@@ -133,16 +132,17 @@ class FileCache
       str[:cache][item['Country']] = hashtable[item['Country']]
     end
 
-    File.open(@filename, 'w') do |f|
+    File.open(@filename, 'w+') do |f|
       f.write(JSON.pretty_generate(str))
     end
   end
 
   def open(full_info, argv, htp)
+    new_structure(htp) if File.zero?(@filename) || !File.exist?(@filename)
     f = File.open(@filename, 'r')
     parsed = JSON.parse(f.read)
     t = Time.parse(parsed['updated_at'])
-    new_structure(htp) if File.zero?(@filename) || ((Time.now.to_i - t.to_i) > $lifetime * 1 / 60)
+    new_structure(htp) if (Time.now.to_i - t.to_i) > LIFETIME * 1 / 60
     full_info.statistics(argv)
   end
 end
